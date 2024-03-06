@@ -1,0 +1,43 @@
+기존 대소문자 변경 메소드
+코틀린에서는 대소문자 변경해주는 메소드들이 있었습니다.
+- toUpperCase
+문자열의 모든 문자를 대문자로 변경시켜줍니다.
+println("abc".toUpperCase())//->ABC
+println("aBc".toUpperCase())//->ABC
+println("ABC".toUpperCase())//->ABC
+- toLowerCase
+문자열의 모든 문자를 소문자로 변경시켜줍니다.
+println("abc".toLowerCase())//->abc
+println("AbC".toLowerCase())//->abc
+println("ABC".toLowerCase())//->abc
+- capitalize
+문자열의 첫번째 문자를 대문자로 변경시켜줍니다.
+println("aBC".capitalize())//->ABC
+println("abc".capitalize())//->Abc
+println("ABC".capitalize())//->ABC
+- decapitalize
+문자열의 첫번째 문자를 소문자로 변경시켜줍니다.
+println("ABC".decapitalize())//->aBC
+println("Abc".decapitalize())//->abc
+println("abc".decapitalize())//->abc
+
+
+문제점 발생
+단순히 영어 알파벳에 사용한다면 문제는 없을 겁니다. 하지만 다른 나라 언어는 어떨까요. ”Kotlin”.toUpperCase() 결과로는 KOTLIN 라고 생각할 수도 있지만 튀르키예어에서는 대문자가 İ이므로 KOTLİN이라는 다른 결과가 얻어집니다. 사실 toUpperCase()같이 기존의 대소문자 변경 메서드에서는 매개변수로 특징 지역을 설정할 수 있는 Locale형의 locale를 받았습니다. 하지만 Local를 받지 않는 메소드로도 오버로딩 되어있는데, 내부적으로 보면 toUpperCase(Locale.getDefault())를 호출하고 있습니다. Locale.getDefault()는 Java Virtual Machine에서 기본 지역 정보를 얻습니다. 그러니 튀르키예에서는 자동으로 i를 I가 아닌 İ로 변환하기 때문에 혼란이 발생할 수 있습니다.
+
+
+대체된 대소문자 변경 메소드
+변경된 메소드에서는 locale를 신경쓰지 않아도 됩니다. 내부적으로 알아서 해결해주기 때문입니다. 예를 들어 uppercase()의 경우 내부적으로 
+public actual inline fun String.uppercase(): String = (this as java.lang.String).toUpperCase(Locale.ROOT)
+호출합니다. toUpperCase()에 Locale.ROOT를 전달하는데 Locale.ROOT는 중립적인 로케일로 일관된 결과를 배출합니다. 즉, Kotlin에 대해 KOTLIN인지 KOTLİN인지, 미국이든 튀르키예이든 항상 KOTLIN으로 리턴해줍니다.
+- toUpperCase -> uppercase()
+물론 원하는 locale 전달할 수 있습니다. char형에서 char형으로 리턴해주는 uppercaseChar()도 있습니다.
+- toLowerCase -> lowercase()
+물론 원하는 locale 전달할 수 있습니다. char형에서 char형으로 리턴해주는 lowercaseChar()도 있습니다.
+- capitalize(), decapitalize() -> replaceFirstChar()
+replaceFirstChar()는 문자열의 첫번째 문자를 람다식에 따라 처리하는 메서드 입니다. 
+즉, capitalize()처럼 사용하려면
+println("abc".replaceFirstChar { it.uppercase() })
+decapitalize()처럼 사용하려면
+println("ABC".replaceFirstChar { it.lowercase() })
+같이 사용하면 됩니다. 
