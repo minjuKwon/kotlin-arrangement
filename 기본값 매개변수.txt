@@ -1,0 +1,86 @@
+코틀린에서는 함수 매개변수에 기본 값을 설정할 수 있습니다. 해당 매개변수를 생략한 채 함수를 호출할 수 있어 코드가 간결해지고 유연한 호출이 가능한 장점이 있죠. 그런데 이 기본 값 매개변수는 어떠한 원리로 작동되는지 의문이 생겼습니다. 그래서 오늘 이에 대해 포스팅을 하도록 하겠습니다. 
+
+우선 함수 매개변수에 기본 값을 선언하겠습니다. 
+
+fun getA(a:Int=2){
+    println(a)
+}
+
+fun main(){
+    getA()
+}
+
+위 코드를 디컴파일 해보겠습니다.
+
+public static void main(String[] var0) {
+      main();
+}
+
+public static final void main() {
+      getA$default(0, 1, (Object)null);
+}
+//디폴트 매개변수를 처리하는 헬퍼 메서드
+public static void getA$default(int var0, int var1, Object var2) {
+      if ((var1 & 1) != 0) {
+         //기본 값 할당
+         var0 = 2;
+      }
+
+      getA(var0);
+}
+
+public static final void getA(int a) {
+      System.out.println(a);
+}
+
+우선 하나씩 살펴보도록 하겠습니다. 
+
+public static void getA$default(int var0, int var1, Object var2) {
+      if ((var1 & 1) != 0) {
+         var0 = 2;
+      }
+      getA(var0);
+}
+
+기존에 선언한 getA()뿐만 아니라 getA$default()라는 메서드가 생성되었습니다. getA$default()는 기본 매개변수를 처리하기 위해 컴파일러가 생성한 헬퍼 메서드입니다. 매개변수로 int형 2개, Object형을 1개 받고 있습니다. var0은 기본 매개변수, var1는 비트마스크, var2는 사용하지 않는 매개변수입니다. 자세한 것은 내부 코드와 함께 설명하도록 하겠습니다.
++비트 마스크
+비트(bit)를 통해 이진수 표현을 사용하는 기법. '$'같은 비트 연산을 사용하기 때문에 연산 시간과 메모리 사용량이 적아 속도가 빠른 장점을 가짐.
+
+if ((var1 & 1) != 0) {
+    var0 = 2;
+}
+
+위에서 언급했듯이 var0는 매개변수에 부여한 기본 값이고 var1는 비트마스크입니다. var1를 이용하여 비트 연산을 한 후 0이 아니면(비트이기에 1이 된다면) 전달한 기본 값을 할당하게 됩니다. 만약 0이라면 직접 함수에 전달한 값을 가지게 됩니다. 저희는 기본 값을 가지기 때문에 내부적으로 getA$default()에서 1을 전달하게 됩니다.
+
+public static final void main() {
+      getA$default(0, 1, (Object)null);
+}
+
+비트 연산을 통해 함수에 기본 값을 전달하는지 별도의 변수를 전달하는지 판단을 한 후에야 해당 함수를 호출합니다. 즉, 기본 매개변수를 생성하면 이를 처리하는 메서드를 생성한 후 그 내부에서 원본 함수를 호출하는 흐름을 가집니다. 
+
+getA(var0)
+
+별도의 $default 메서드를 생성한 또다른 이유는 코틀린은 자바와의 호환성을 유지하기 위해섭니다. 자바에서는 기본 값을 가질 수 없기 때문이죠.
+
+그럼 var3의 역할을 무엇일까요? var3는 코드에 사용하지 않는 변수로 컴파일에 사용됩니다. 코틀린은 JVM에서 실행하는데 이때 메서드 시그니처(이름 + 매개변수 타입 조합)가 서로 달라야 합니다. 이때 var3가 시그니처 고유성을 도와줍니다. 다음 예제를 보겠습니다. 
+
+fun example(value: String = "default") {
+    println(value)
+}
+
+위와 같은 코드가 있다고 하겠습니다. 만약 var3이 없이 디컴파일이 된다면 다음과 같이 됩니다
+
+public static void example$default(String value, int mask) {
+    if ((mask & 1) != 0) {
+        value = "default"; 		
+    }
+    example(value);
+}
+
+이 상황에서 만약 다음과 같은 코드를 추가합니다
+
+fun example(value: String, mask: Int) { 
+    println("$value - mask: $mask")
+}
+
+앞의 디컴파일러된 example와 같은 시그니처를 가지게 됩니다. 이를 구별하게 위해 사용되지 않는 추가 매개변수가 생성되는 겁니다.
