@@ -8,54 +8,241 @@
 기존 객체를 상속하지 않고, 합성을 통해 기능을 확장하는 패턴. 즉, 기능을 추가한 객체가 기존 객체를 멤버로 포함하는 방식. 기존 코드를 수정하지 않고도 새로운 기능을 동적으로 추가할 수 있지만, 객체가 중첩되는 형태로 구성되므로 구조가 복잡
 
 
-2. 특징
-1)동작 방식
+
+2. 원리
+1) 확장의 의미
 - 확장을 정의해도 실제 클래스에 메서드나 프로퍼티 추가를 의미X
 - 객체 내부에 값을 저장할 수 없으므로 일회성처럼 동작
+- 값을 저장하지 않기 때문에 확장 프로퍼티를 val이나 var으로 선언시 초기화(back field) 사용 불가능
+- 프로퍼티를 정의할 때는 반드시 getter 정의 필요. 이 때문에 마치 함수처럼 동작
+- 프로퍼티는 주로 타입 변환, 문자열 처리, 형식 변환, 조건 처리 등에 사용
+- 예제
+ - IceCream 클래스에 토핑 추가를 만들고 싶을 때 확장을 통해 쉽게 기능 추가 가능
+ - 지금은 구조가 단순하지만 복잡해지거나 수정이 불가한 경우 유용하게 사용 가능
+class IceCream{
+    fun order(){
+        println("Order Ice Cream")
+    }
+}
+fun IceCream.addCookieTopping()=println("Topping - cookie")
+fun main(){
+    val iceCream= IceCream()
+    iceCream.order()//Order Ice Cream
+    iceCream.addCookieTopping()//Topping - Cookie
+}
+
+- 프로퍼티의 경우 getter 사용 필수. getter를 통해 함수처럼 값 반환 가능
+//val IceCream.cookieTopping=""// 초기화 불가
+val IceCream.cookieTopping:String
+    get()="Topping - cookie"
+fun main(){
+    val iceCream= IceCream()
+    iceCream.order() //Order Ice Cream
+    println(iceCream.cookieTopping)//Topping - Cookie
+}
+
+- 확장 프로퍼티로 계산된 정보 반환 가능
+class IceCream(val size:Int){
+    fun order(){
+        println("Order Ice Cream")
+    }
+}
+val IceCream.sizeLabel:String
+    get()=when{
+        size<=200 -> "small"
+        size<500 -> "medium"
+        else -> "large"
+    }
+fun main(){
+    val iceCream= IceCream(200)
+    println(iceCream.sizeLabel)//small
+}
 
 
-2)스코프와 사용 조건
-- 확장 함수를 정의해도 명시적으로 import 해야 다른 파일에서 사용 가능함
+2)내부 코드
+- 디컴파일 결과를 보면 확장 함수는 정적 함수로 변환되며 수신 객체는 일반 매개변수처럼 전달
+- 확장 프로퍼티의 경우 해당 내용의 get 메서드로 생성
+- 기존 클래스 구조를 건드리지 않고 외부에서 마치 기능이 추가된 것처럼 사용 가능
+- 예제
+ - String 확장 함수
+fun String.addBang()=println("$this!")
+
+ public static final void addBang(@NotNull String $this$addBang) {
+     //null-safety 보장을 위해 null 체크 삽입. 컴파일러가 자동으로 추가.
+      Intrinsics.checkNotNullParameter($this$addBang, "$this$addBang");
+     //호출할 때의 this가 $this$addBang으로 변환되어 확장 함수 내용 처리
+      String var1 = $this$addBang + '!';
+      System.out.println(var1);
+   }
+
+ - IceCream 클래스의 확장 함수와 프로퍼티
+class IceCream
+fun IceCream.addCookieTopping()=println("Topping - cookie")
+val IceCream.cookieTopping:String
+    get()="Topping - cookie"
+
+//위 예제와 달리 호출객체(this)를 사용하지 않았기에 단순히 확장 함수 값을 그대로 사용(해당 값 출력)
+  public static final void addCookieTopping(@NotNull IceCream $this$addCookieTopping) {
+      Intrinsics.checkNotNullParameter($this$addCookieTopping, "$this$addCookieTopping");
+      String var1 = "Topping - cookie";
+      System.out.println(var1);
+   }
+  //확장 프로퍼티 getter를 static으로 변환 후 해당 값을 반환
+   @NotNull
+   public static final String getCookieTopping(@NotNull IceCream $this$cookieTopping) {
+      Intrinsics.checkNotNullParameter($this$cookieTopping, "$this$cookieTopping");
+      return "Topping - cookie";
+   }
+
+
+
+3. 특징
+1)스코프와 사용 조건
+- 다른 파일에서 확장을 사용하려면 명시적으로 import 해야 가능함
 - 전역처럼 사용 불가능
+- 예제
+package org.example.declarations
+fun List<String>.getLongestString() { /*...*/}
+
+package org.example.usage
+import org.example.declarations.getLongestString
+fun main() {
+    val list = listOf("red", "green", "blue")
+    list.getLongestString()
+}
 
 
-3)접근 제한자 제한
-- public 멤버에만 접근 가능.
-- private 또는 protected 멤버에는 접근 불가. 이런 경우에는 클래스 내부 멤버로 구현 필요
+2)접근 제한자 제한
+- 일반 함수와 동일한 접근 제한자 사용. public 멤버에만 접근 가능.
+- 확장이 파일의 최상위 수준에 선언된 경우, 같은 파일 내의 최상위 수준의 private에 접근 가능
+- 외부에 선언된 경우, private 또는 protected 접근 불가. 이런 경우에는 클래스 내부 멤버로 구현 필요
+- 예제
+//FileA.kt
+private fun printFileA()="FileA"
+fun String.showFileA():String{
+    return printFileA()//접근 가능
+}
+//FileB.kt
+fun String.showFileB():String{
+    return printFileA()//접근 불가능
+}
 
 
-4)this 키워드의 의미
-- 확장 내부의 this는 수신 객체(receiver object)를 의미
-- 확장은 수신 타입(receiver type)을 기반으로 정의. this는 해당 타입의 인스턴스를 가리킴.
+3)this 키워드의 의미
+- 확장 내부의 this는 수신 객체(receiver object)를 의미. 해당 확장을 호출하는 실제 객체
+- 확장은 수신 타입(receiver type)을 기반으로 정의. 결론적으로 this는 해당 타입의 인스턴스를 가리킴.
+- 예제
+fun MutableList<Int>.swap(index1: Int, index2: Int) {
+    val tmp = this[index1] // 이때 this는 아래 변수 list를 의미
+    this[index1] = this[index2]
+    this[index2] = tmp
+}
+fun main(){
+//변수 list가 수신 객체. 수신 타입은 MutableList<Int>
+val list = mutableListOf(1, 2, 3)
+list.swap(0, 2) // 'this' inside 'swap()' will hold the value of 'list'
+}
 
 
-5)멤버와의 우선순위
+4)멤버와의 우선순위
 - 동일한 이름의 멤버 함수가 클래스에 존재할 경우, 확장 함수보다 멤버 함수가 우선 호출. 프로퍼티도 동일
-- 확장 프로퍼티를 정의할 때는 반드시 getter 정의 필요
+- 예제
+class IceCream(val size:Int){
+    fun order(){
+        println("Order Ice Cream")
+    }
+}
+fun IceCream.order()=println("아이스크림 주문")
+fun main(){
+    val iceCream= IceCream(200)
+    //기존 함수 메서드인 Order Ice Cream 출력
+    iceCream.order()
+}
 
 
-6)상속과 오버라이딩 제한
-- 확장 함수는 상속 불가
-- 하위 클래스에서 확장 함수를 오버라이딩 불가
-- 단, 같은 함수 이름으로 오버로드(다중 정의)는 가능
-
-
-7)바인딩 방식 차이
+5)동적 바인딩
 - 일반 멤버는 동적 바인딩. 런타임에 호출 함수 결정.
 - 확장은 정적 바인딩. 컴파일 시점에 호출 함수 결정.
+- 런타임 타입과 관계없이 확장 정의 때의 타입 기준으로 동작
+- 예제
+open class Shape
+class Rectangle: Shape()
+
+fun Shape.getName() = "Shape"
+fun Rectangle.getName() = "Rectangle"
+
+fun printClassName(s: Shape) {
+    println(s.getName())
+}
+
+//실제 인스턴스는 Rectangle이지만 정적 타입은 Shape.
+//정적 바인딩이기에 런타임 타입인 Shape이 아닌 Retangle 출력
+printClassName(Rectangle())//Shape
 
 
-8)Companion Object 확장 가능
+6)오버라이딩 제한
+- 동적 바인딩 때문에 하위 클래스에서 확장 함수 오버라이딩 불가
+- 단, 같은 함수 이름으로 오버로드(다중 정의)는 가능
+- 예제
+ - 오버라이딩
+open class Parent{
+    open fun print(){
+        println("Parent")
+    }
+}
+
+fun Parent.say()=println("Hello Parent")
+
+class Child: Parent() {
+    override fun print() {
+        super.print()
+    }
+    /*오버라이딩 불가능
+    override fun say() {
+        super.print()
+    }*/
+}
+
+ - 오버로드
+open class Parent{
+    open fun print(){
+        println("Parent")
+    }
+}
+fun Parent.print(str:String)= println("$str Parent")
+fun main(){
+    val parent= Parent()
+    parent.print()
+    parent.print("Thank you")
+}
+
+
+7)Companion Object 확장 가능
 - 클래스의 companion object에도 확장 함수 정의 가능
+- 확장 함수는 클래스 인스턴스를 외부 함수의 매개변수로 처리하는 구조이므로, Companion Object도 일반 객체처럼 확장
+- 예제
+class MyClass {
+    companion object { }  // will be called "Companion"
+}
+fun MyClass.Companion.printCompanion() { println("companion") }
+fun main() {
+    MyClass.printCompanion()
+}
 
 
-9)제네릭 타입 확장 가능
+8)제네릭 타입 확장 가능
 - 제네릭 클래스에 대해서도 확장 함수 정의 가능
-- MutableList<Int> 대신 MutableList<T>로 범용 처리 가능
+- 제네릭은 기본적으로 컴파일 시점에 타입이 결정되는 정적 시스템이기에 사용 가능
+- 예제
+fun <T> MutableList<T>.swap(index1: Int, index2: Int) {
+    val tmp = this[index1] // 'this' corresponds to the list
+    this[index1] = this[index2]
+    this[index2] = tmp
+}
 
 
 
-3. 사용법
+4. 사용법
 1)클래스 확장
 특히 컬렉션. 일급 컬렉션
 
@@ -78,7 +265,15 @@ null처리
 
 
 7)안드로이드
-안드로이드에서 사용할 수 있는 유용한 사용법에 대해 설명하는 블로그 주소
+- 안드로이드에서 사용할 수 있는 유용한 사용법에 대해 설명하는 블로그 주소
+ - https://best-coding.tistory.com/m/76
+ - https://dongx2.tistory.com/123
 
-- https://best-coding.tistory.com/m/76
-- https://dongx2.tistory.com/123
+
+
+참고
+- https://kotlinlang.org/docs/extensions.html#scope-of-extensions
+- https://todaycode.tistory.com/176
+- https://velog.io/@minju0426/Kotlin-%ED%99%95%EC%9E%A5%ED%95%A8%EC%88%98%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%98%EB%8A%94-%EB%B2%95how-to-use-Extension-Function
+- https://jinn-blog.tistory.com/17
+- https://best-coding.tistory.com/75?category=1220664
