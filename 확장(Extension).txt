@@ -160,7 +160,43 @@ fun main(){
 }
 
 
-5)동적 바인딩
+5)클래스 내부에서의 확장
+- 어떤 클래스 내부에서 다른 클래스에 대한 확장 함수를 선언 가능
+- 디스패치 수신자(dispatch receiver): 확장 함수가 선언된 클래스의 인스턴스. 외부 클래스의 멤버에 접근 가능
+- 확장 수신자(extension receiver): 확장 함수의 수신 대상 클래스의 인스턴스. 확장 함수 안에서 this 키워드는 확장 수신자를 의미. this에 qualifier 없이 접근 가능해 암시적 수신자라고도 불림. 
+- 예제
+class Host(val hostname: String) {
+    fun printHostname() { print(hostname) }
+}
+
+class Connection(val host: Host, val port: Int) {
+    fun printPort() { print(port) }
+
+    fun Host.printConnectionString() {
+        printHostname()   //Host.printHostname() 호출(확장 수신자)
+        print(":")
+        printPort()   // Connection.printPort() 호출(디스패치 수신자)
+    }
+
+    fun connect() {
+        /*...*/
+        host.printConnectionString()   // 확장 함수 호출
+    }
+
+   fun Host.getConnectionString() {
+        this.toString()         // Host.toString() 호출(확장 수신자)
+        this@Connection.toString()  // Connection.toString() 호출(디스패치 수신자)
+    }
+
+}
+
+fun main() {
+    Connection(Host("kotl.in"), 443).connect()
+    //Host("kotl.in").printConnectionString()  // 에러 발생. Connection 외부에서 확장 함수 호출 불가능
+}
+
+
+6)동적 바인딩
 - 일반 멤버는 동적 바인딩. 런타임에 호출 함수 결정.
 - 확장은 정적 바인딩. 컴파일 시점에 호출 함수 결정.
 - 런타임 타입과 관계없이 확장 정의 때의 타입 기준으로 동작
@@ -180,7 +216,7 @@ fun printClassName(s: Shape) {
 printClassName(Rectangle())//Shape
 
 
-6)오버라이딩 제한
+7)오버라이딩 제한
 - 동적 바인딩 때문에 하위 클래스에서 확장 함수 오버라이딩 불가
 - 단, 같은 함수 이름으로 오버로드(다중 정의)는 가능
 - 예제
@@ -217,7 +253,7 @@ fun main(){
 }
 
 
-7)Companion Object 확장 가능
+8)Companion Object 확장 가능
 - 클래스의 companion object에도 확장 함수 정의 가능
 - 확장 함수는 클래스 인스턴스를 외부 함수의 매개변수로 처리하는 구조이므로, Companion Object도 일반 객체처럼 확장
 - 예제
@@ -230,7 +266,7 @@ fun main() {
 }
 
 
-8)제네릭 타입 확장 가능
+9)제네릭 타입 확장 가능
 - 제네릭 클래스에 대해서도 확장 함수 정의 가능
 - 제네릭은 기본적으로 컴파일 시점에 타입이 결정되는 정적 시스템이기에 사용 가능
 - 예제
