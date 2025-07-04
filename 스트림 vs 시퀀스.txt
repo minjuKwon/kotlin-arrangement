@@ -38,6 +38,7 @@ https://www.elancer.co.kr/blog/detail/255
 
 
 3. Stream vs Sequence
+1)비교
 | 특징 |  자바 스트림 (Stream) |코틀린 시퀀스 (Sequence) |
 | --- | --- | --- |
 |언어와 플랫폼 |  자바 8+의 표준 라이브러리 |코틀린에 최적화된 API |
@@ -48,3 +49,55 @@ https://www.elancer.co.kr/blog/detail/255
 | 멀티스레딩 지원|  병렬 스트림(parallelStream())으로 멀티스레딩 가능 |시퀀스 자체는 멀티스레딩을 지원하지 않음 |
 | 최종 연산 결과 | 컬렉션, 단일 값, 또는 특화된 스트림 결과 반환 |컬렉션 또는 단일 값으로 변환 가능 | 
 | 호환성 |  코틀린 컬렉션과 호환하려면 변환 필요 |자바 컬렉션과도 호환 가능 |
+
+
+2)예시 코드
+- 스트림
+numbers.stream()
+            .map(n -> {
+                System.out.println("map: " + n);
+                return n * 2;
+            })
+            .filter(n -> {
+                System.out.println("filter: " + n);
+                return n > 2;
+            })
+            .forEach(n -> System.out.println("result: " + n));
+/*
+map: 1
+map: 2
+map: 3
+filter: 2
+filter: 4
+filter: 6
+result: 4
+result: 6
+모든 map 수행 후 모든 filter 수행
+*/
+
+-시퀀스
+numbers.asSequence()
+        .map {
+            println("map: $it")
+            it * 2
+        }
+        .filter {
+            println("filter: $it")
+            it > 2
+        }
+        .forEach {
+            println("result: $it")
+        }
+
+/*
+map: 1
+filter: 2
+map: 2
+filter: 4
+result: 4
+map: 3
+filter: 6
+result: 6
+
+각 항목 단위로 실행
+*/
