@@ -9,26 +9,8 @@
 2)목적
 - 런타임 구조 분석: 클래스, 함수, 프로퍼티, 타입 파라미터 등을 런타임에 동적으로 확인
 - 동적 동작 제어: 컴파일 시점에 알 수 없는 요소(함수, 속성 등)를 실행 시간에 호출 또는 수정
-- 메타프로그래밍: 코드 구조 자체를 데이터처럼 다루어 유연한 로직 구현
-- 프레임워크 내부 동작: 의존성 주입, 직렬화, ORM 등에서 객체 구조 자동 분석
-
-
-3)사용 용도
-- 객체 직렬화/역직렬화
-   - JSON ↔ 객체 변환 시 필드와 타입 분석 필요
-   - kotlinx.serialization, Moshi, Gson 등
-- 의존성 주입 (DI)
-   - 생성자 파라미터 분석 후 객체 자동 생성
-   - Koin, Dagger(Hilt) 등
-- 테스트 프레임워크
-    - 애노테이션 기반 테스트 탐색 및 실행
-    - @Test, @BeforeEach 등
-- API 자동화 / 문서화
-   - REST API에서 요청/응답 구조 자동 추출
-   - Swagger, ktor features 등
-- DSL, 컴파일러 플러그인, 내부 프레임워크
-   - 커스텀 애노테이션 처리, 바이트코드 생성, 내부 설정 기반 로직 구성 등
-   - Anvil, Compose compiler 등
+- 메타프로그래밍: 메타 프로그래밍이란 자신이나 다른 프로그램을 데이터로 취급하는 기술을 의미. 코드 구조 자체를 데이터처럼 다루어 유연한 로직 구현 가능. 즉, 함수명이나 프로퍼티명을 코드에 직접 하드코딩하지 않고 메타정보를 기반으로 프로그램 흐름을 결정하거나 동작을 실행
+- 프레임워크 내부 동작 자동화: 직렬화, 의존성 주입, ORM 등의 프레임워크 내부에서 활용. 객체 구조를 분석하여 자동으로 변환, 생성, 매핑하는데 사용
 
 
 
@@ -36,9 +18,12 @@
 - 코틀린의 리플렉션은 자바 리플렉션과 상호작용 가능
 - 자바에서는 MyClass.class를 사용해 Class<T>를 얻음
 - 코틀린에서는 MyClass::class 형태로 KClass<*> 객체를 얻음
-- KClass는 자바의 Class와 동일하지 않으며, 필요시 MyClass::class.java로 Class<T>를 얻을 수 있음
-- kClass.java: 코틀린의 KClass를 자바의 Class로 변환하는 확장 프로퍼티
-- javaClass.kotlin: 자바의 Class 객체를 코틀린의 KClass로 변환하는 확장 프로퍼티
+- KClass는 자바의 Class와 동일하지 않으며, 코틀린에서 자바의 Class가 필요하면 MyClass::class.java로 Class<T>를 얻을 수 있음
+ val kClass = String::class
+val javaClass = kClass.java // java.lang.String
+- 자바의 Class객체를 코틀린의 KClass로 변환하고 싶으면 javaClass.kotlin으로 얻을 수 있음
+val javaClass = String::class.java
+val kClass = javaClass.kotlin // kotlin.String::class
 
 특징	자바 (Class<T>)	코틀린 (KClass<T>)
 기본 제공	JVM 리플렉션 시스템	코틀린 리플렉션 시스템
@@ -47,16 +32,17 @@
 언어 통합성	자바 리플렉션에 최적화	코틀린 고유 기능(DSL, 확장 함수)과 통합
 변환 가능	-	KClass::java, Class::kotlin
 기본 포함 여부	JDK에 내장	kotlin-reflect 별도 의존성 필요
-동적 호출 방식	method.invoke(obj, args...)	kFunction.call(...), callBy(...)
+동적 호출 방식	method.invoke(obj, args...)	kFunction.call(...), callBy(...)(내부적으로 invoke호출)
 null 안정성	없음 (런타임 오류 발생 가능)	일부 타입 시스템 반영 (KType, nullable)
 
 
 
 3. 구성요소
 1)KClassifier
-- KType이 어떤 타입을 참조하는지 나타내는 메타정보 인터페이스. 즉, 타입의 "정체"를 구분하는 역할.
-- 주로 KType.classifier 프로퍼티를 통해 접근하며, 해당 타입이 어떤 종류의 선언(KClass, 타입 파라미터 등) 인지를 알려줌
-- 타입이 String, List<Int>, T, Comparable<T>일 때,  이 타입이 클래스인지 타입 매개변수인지를 식별
+interface KClassifier
+- 해당 타입이 어떤 종류의 선언인지를 알려주는 메타정보 인터페이스. 즉, 타입의 "정체"를 구분하는 역할.
+- 주로 KType.classifier 프로퍼티를 통해 접근하며 KType이 어떤 타입을 참조하는지 나타냄
+- 해당 타입이 정의된 클래스인지(예: String, List<Int>) 아니면 제네릭 타입 변수인지(예: T, Comparable<T>)를 구분
 - 구현 클래스
    - KClass<*>: 실제 클래스 또는 인터페이스 (String::class, List::class 등)
    - KTypeParameter: 타입 파라미터 (T, R 등 제네릭 매개변수)
@@ -67,31 +53,61 @@ null 안정성	없음 (런타임 오류 발생 가능)	일부 타입 시스템 �
 
 
 2)KTypeParameter
-- 타입 파라미터 표현. 제네릭 선언부에서 등장하는 타입 변수 (T, R 등)를 나타냄. 
+interface KTypeParameter : KClassifier
+- 타입 파라미터 표현. 제네릭 선언부에서 등장하는 타입 변수 (T, R 등)를 표현
 - KClass.typeParameters, KFunction.typeParameters 등을 통해 얻음
-- 주요 프로퍼티
+- 주요 멤버
    - name: String - 타입 변수 이름 (T 등)
    - variance: KVariance - 타입 위치 변성 (IN, OUT, INVARIANT)
    - isReified: Boolean - inline 함수에서 reified로 선언됐는지 여부
    - upperBounds: List<KType> - 타입 제한 (T : Number 등)
+- 예제
+   class Box<T : Number>
+    val param = Box::class.typeParameters.first()
+    println(param.name)             // T
+    println(param.variance)         // INVARIANT
+    println(param.isReified)        // false
+    println(param.upperBounds)      // [kotlin.Number]
 
 
 3)KClass
+interface KClass<T : Any> : KDeclarationContainer, KAnnotatedElement, KClassifier
 - 클래스에 대한 정보를 담는 대표적인 리플렉션 타입
 - Java의 Class와 유사한 역할
+- KDeclarationContainer는 해당 요소(함수, 프로퍼티 등)가 어디에 선언되어 있는지를 표현하는 인터페이스. 이를 통해 선언 위치나 선언된 목록 확인 가능
 - 주요 멤버
-   - simpleName: 클래스 이름
-   - qualifiedName: 전체 패키지 이름 포함 클래스명
-   - constructors: 선언된 생성자 목록
-   - members: 모든 멤버 (함수, 프로퍼티 포함)
-   - declaredMemberFunctions: 선언된 멤버 함수
-   - declaredMemberProperties: 선언된 프로퍼티
+   - simpleName: String?: 클래스 이름. 익명 객체 클래스처럼 이름이 존재하지 않는 경우 null 반환
+   - qualifiedName: String? - 전체 패키지 이름 포함 클래스명. 로컬 클래스나 익명 객체의 클래스인 경우에는 null을 반환
+   - constructors: Collection<KFunction<T>> - 선언된 생성자 목록
+   - members: Collection<KCallable<*>> - 부모 클래스와 해당 클래스의 모든 멤버 (함수, 프로퍼티 포함, 생성자 미포함)
+   - typeParameters: List<KTypeParameter> - 클래스에 선언된 타입 매개변수들의 목록. 외부 클래스(outer class)에서 선언된 타입 매개변수는 미포함
+   - annotations: List<Annotation> - 선언된 애노테이션
    - isAbstract, isCompanion, isData 등 클래스 특성 정보
+- 예제
+    val kclass: KClass<String> = String::class
+    println(kclass.simpleName) // String
+    println(kclass.qualifiedName) // kotlin.String
+    println(kclass.constructors) // [fun `<init>`(): kotlin.String]
+    println(kclass.members)
+    // [val kotlin.String.length: kotlin.Int,
+    // fun kotlin.String.compareTo(kotlin.String): kotlin.Int,
+    // fun kotlin.String.equals(kotlin.Any?): kotlin.Boolean,
+    // fun kotlin.String.get(kotlin.Int): kotlin.Char,
+    // fun kotlin.String.plus(kotlin.Any?): kotlin.String,
+    // fun kotlin.String.subSequence(kotlin.Int, kotlin.Int): kotlin.CharSequence,
+    // fun kotlin.String.toString(): kotlin.String,
+    // fun kotlin.String.chars(): java.util.stream.IntStream!,
+    // fun kotlin.String.codePoints(): java.util.stream.IntStream!,
+    // fun kotlin.String.hashCode(): kotlin.Int]
+    println(kclass.typeParameters) // []
+    println(kclass.annotations) // []
+    println(kclass.isData) // false
 
 
 4)KAnnotatedElement
+interface KAnnotatedElement
 - 애노테이션을 보유할 수 있는 모든 요소의 공통 인터페이스
-- 애노테이션이 붙을 수 있는 함수, 클래스, 프로퍼티 등에서 공통적으로 사용
+- 애노테이션이 붙을 수 있는 함수, 클래스, 프로퍼티 등에서 공통적으로 구현
 - 주요 멤버
    - annotations: List<Annotation> - 해당 요소에 선언된 모든 애노테이션 목록
    - findAnnotation<T: Annotation>() - 특정 애노테이션을 조회 (없으면 null)
@@ -99,79 +115,150 @@ null 안정성	없음 (런타임 오류 발생 가능)	일부 타입 시스템 �
 
 
 5)KType
-- 런타임 타입, 정적 타입 정보를 표현
+interface KType : KAnnotatedElement
+- 타입 정보를 표현
 - 클래스, 제네릭, 널 허용 여부 등의 정보를 포함
 - 주요 멤버
    - classifier: KClassifier? - 이 타입의 주체 (KClass 또는 KTypeParameter)
-   - arguments: List<KTypeProjection> - 제네릭 타입 인자 (List<String>의 String 등)
+   - arguments: List<KTypeProjection> - 제네릭 타입 인자 (List<String>의 String 등). type, variance를 얻을 수 있음
    - isMarkedNullable: Boolean - 타입이 ?로 명시된 nullable인지 여부
+- 예제
+   val kType = List::class.supertypes.first()
+    println(kType.classifier) // class kotlin.collections.Collection
+    println(kType.arguments)  // [E]
+    println(kType.arguments.first().type)  // E
+    println(kType.arguments.first().variance )  // INVARIANT
+    println(kType.isMarkedNullable)  // false
 
 
-6)KTypeProjection
-- 제네릭 타입에 전달된 타입 인자 하나를 나타냄
-- 예로 List<out String>의 out String.
-- 주요 멤버
-   - type: KType?	- 인자로 전달된 타입 (String, Int 등)
-   - variance: KVariance? - 변성 (in, out, invariant)
-
-
-7)KParameter
-- 함수나 프로퍼티의 매개변수 정보를 표현하는 클래스
+6)KParameter
+interface KParameter : KAnnotatedElement
+- 함수나 프로퍼티의 매개변수 정보를 표현
 - KCallable.parameters를 호출하면 KParameter 객체 리스트 반환. 이들을 통해 매개변수의 이름, 타입, 위치, 기본값 여부 등을 확인
 - 주요 멤버
-   - name: String?	- 매개변수 이름 (컴파일 옵션에 따라 null일 수 있음)
+   - name: String?	- 매개변수 이름. 이름이 없거나 런타임에 이름 정보를 사용할 수 없는 경우에는 null 반환. 멤버 함수에서의 this 인스턴스, 확장 함수나 프로퍼티의 리시버 파라미터 (this, receiver), 디버그 정보 없이 컴파일된 Java 메서드의 파라미터 등이 null 반환
    - index: Int - 매개변수의 인덱스 (정렬된 순서 기준)
    - type: KType - 매개변수의 타입
    - isOptional: Boolean - 기본값이 지정된 매개변수 여부
    - isVararg: Boolean - 가변 인자 여부 (vararg)
-   - kind: KParameter.Kind - 매개변수 종류 (INSTANCE, EXTENSION_RECEIVER, VALUE)
+   - kind: KParameter.Kind - 매개변수 종류
       - INSTANCE: 클래스 멤버의 수신 객체 (예: this)
       - EXTENSION_RECEIVER: 확장 함수의 수신 객체 (예: String.foo())
       - VALUE: 일반 매개변수
+- 예제
+class Person(val name: String)
+fun greet(person: Person, greeting: String = "Hello") = "$greeting, ${person.name}"
+fun main(){
+    val func = ::greet
+    for (param in func.parameters) {
+        println("Name=${param.name}, Index=${param.index}, Type=${param.type}, " +
+                "Optional=${param.isOptional}, Vararg=${param.isVararg}, Kind=${param.kind}")
+    }
+    /*
+    * Name=person, Index=0, Type=Person, Optional=false, Vararg=false, Kind=VALUE
+    * Name=greeting, Index=1, Type=kotlin.String, Optional=true, Vararg=false, Kind=VALUE
+    * */
+}
 
 
-8)KCallable
+7)KCallable
+interface KCallable<out R> : KAnnotatedElement
 -  함수나 프로퍼티를 모두 포괄하는 상위 인터페이스
 -  KFunction, KProperty는 둘 다 KCallable을 상속
 - 주요 멤버
-   - name: 이름
-   - simpleName: 클래스 이름
-   - qualifiedName: 패키지 포함 전체 이름
-   - constructors: 선언된 생성자 목록
-   - members: 함수, 프로퍼티 포함 전체 멤버
-   - parameters: 파라미터 리스트 (KParameter)
-   - returnType: 반환 타입 (KType)
-   - declaredMemberFunctions, declaredMemberProperties: 클래스 내부에 선언된 멤버
-   - isAbstract, isCompanion, isData:  클래스 특성 정보
-   - call(vararg args: Any?): 함수 또는 프로퍼티 getter 호출
-   - callBy(Map<KParameter, Any?>): 파라미터 맵 기반 호출 (기본값 고려)
+   - name: String - 이름
+   - parameters: List<KParameter> - KParameter 리스트. this 인스턴스나 확장 수신 객체가 있을 경우 리스트 앞쪽에 위치 
+   - typeParameters: List<KTypeParameter> - KTypeParameter 리스트
+   - returnType: KType -  반환 타입
+   - isAbstract, isFinal, isOpen -  특성 정보
+   - call(vararg args: Any?): 함수 또는 프로퍼티 getter 호출. 지정된 인자 리스트로 KCallable를 호출하고 결과를 반환. 전달한 인자의 수가 parameters.size와 정확히 일치하지 않거나 인자의 타입이 파라미터 타입과 맞지 않으면 예외 발생. 즉, 모든 인자를 정확한 순서대로 지정 필요
+   - callBy(Map<KParameter, Any?>): KParameter와 값의 매핑 정보(Map) 를 사용해 callable 요소를 실행하고 결과 반환. 타입이 매칭되지 않거나 기본 값이 할당 되지 않는 파라미터가 포함되지 않는 경우 예외 발생. 즉, 선택 매개변수는 생략 가능하고 순서 상관 없음. call()에 비해 유연하게 사용 가능.
+- invoke
+   - call()와 callBy() 모두 내부적으로 리플렉션 통해 구조 분석 후 내부적으로 invoke() 호출
+   - 함수의 타입이 명확하고, 파라미터도 고정일 때 invoke() 호출. 직접적으로 호출하기 때문에 성능이 더 좋음. 
+   - 런타임에 함수 구조를 다뤄야 할 때, 함수 시그니처(파라미터 수, 순서 등)를 코드로부터 동적으로 읽어야 할 때 call()/callBy() 사용
 
 
-9)KFunction
-- 함수에 대한 메타정보와 동작을 표현하는 인터페이스
+8)KFunction
+interface KFunction<out R> : KCallable<R> , Function<R> 
+- 함수에 대한 메타정보와 동작을 표현
 - 일반 함수, 람다, 멤버 함수 모두 포함
 - Function 참조 (::)는 기본적으로 KFunction 객체를 반환
 - N개의 인자를 받는 함수에 대해 KFunctionN으로 표현
 - 주요 멤버
-   - parameters: KParameter 리스트 (수신객체, 확장 수신, 일반 파라미터 포함)
-   - returnType: KType 타입 반환
-   - name: 함수 이름
+   - name: String -  함수 이름
+   - parameters: List<KParameter>- KParameter 리스트
+   - typeParameters: List<KTypeParameter> - KTypeParameter 리스트
+   - returnType: KType -  반환 타입
    - isSuspend, isInline, isOperator, isInfix: 특성 정보
-   - call(vararg args: Any?): 인자 전달해 호출 (런타임 타입 검사)
-   - callBy(Map<KParameter, Any?>): 이름 기반 인자 전달 (기본값 지원)
+   - call(vararg args: Any?): 지정된 인자 리스트로 함 호출하고 결과를 반환. 전달한 인자의 수가 parameters.size와 정확히 일치하지 않거나 인자의 타입이 파라미터 타입과 맞지 않으면 예외 발생.
+   - callBy(Map<KParameter, Any?>): KParameter와 값의 매핑 정보(Map) 를 사용해 함수를 실행하고 결과 반환. 타입이 매칭되지 않거나 기본 값이 할당 되지 않는 파라미터가 포함되지 않는 경우 예외 발생.
+- 예제
+fun main(){
+    val kFunc = ::greet
+    println(kFunc.name) // greet
+    println(kFunc.parameters) //[parameter #0 name of fun greet(kotlin.String): kotlin.String]
+    println(kFunc.typeParameters) //[]
+    println(kFunc.returnType) //kotlin.String
+    println(kFunc.isOperator) // false
+    println(kFunc.call("Kotlin")) // Hello, Kotlin
+    println(kFunc.callBy(mapOf(kFunc.parameters[0] to "Java"))) //Hello, Java
+
+}
+
+fun greet(name: String) = "Hello, $name"
 
 
-10)KProperty
+9)KProperty
+interface KProperty<out V> : KCallable<V> 
 - 프로퍼티에 대한 리플렉션 타입. var/val 둘 다 포함 
 - 읽기 전용: val → KProperty<T>
 - 읽기/쓰기 가능: var → KMutableProperty<T>
 - KMutableProperty: 변경 가능한 프로퍼티 (var)
 - KPropertyN
    - KProperty0, KProperty1, KProperty2: 인자의 개수에 따라 다름
-   - KProperty0<V>: 수신 객체 없이 접근 (예: 최상위 변수)
+   - KProperty0<V>: 수신 객체 없이 접근 (전역 변수, object의 프로퍼티 등)
    - KProperty1<T, V>: 하나의 수신 객체를 필요로 하는 프로퍼티 (일반적인 클래스 프로퍼티)
-   - KProperty2<R, T, V>: 두 수신 객체를 필요로 하는 특수한 경우 (드뭄)
+   - KProperty2<R, T, V>: 두 수신 객체를 필요로 하는 특수한 경우ㄴ 
 - 주요 멤버
-   - get(receiver): 수신 객체에서 값 읽기
-   - set(receiver, value): (KMutableProperty에서만) 값 설정
-   - call(receiver): get()과 동일하지만 타입 안정성이 낮음
+   - 접근자 get: 수신 객체에서 값 읽기
+   - 접근자 set: (KMutableProperty에서만) 값 설정
+   - call(vararg args: Any?): get()과 동일하지만 타입 안정성이 낮음. call()은 동적으로 호출할 수 있지만 타입 검증이 런타임에 수행되어 오류 가능성이 높음. 반면 get()은 프로퍼티 접근 전용 API로, 더 명확하고 컴파일 타임 타입 안정성이 높음
+- 예제
+fun main(){
+    val person = Person("Alice")
+    val prop = Person::name
+    println(prop.get(person)) // Alice
+    if (prop is KMutableProperty1) {
+        prop.set(person, "Bob")
+    }
+    println(prop.call(person)) //Bob
+
+    val prop0: KProperty0<String> = ::version
+    println(prop0.get()) // "1.0"
+    val prop1: KProperty1<Person, String> = Person::name
+    println(prop1.get(Person("Charlie")))//Charlie
+
+}
+class Person(var name: String)
+const val version: String = "1.0"
+
+
+
+4. 사용 사례
+1)객체 직렬화/역직렬화
+   - JSON ↔ 객체 변환 시 필드와 타입 분석 필요
+   - kotlinx.serialization, Moshi, Gson 등
+2)의존성 주입 (DI)
+   - 생성자 파라미터 분석 후 객체 자동 생성
+   - Koin, Dagger(Hilt) 등
+3)테스트 프레임워크
+    - 애노테이션 기반 테스트 탐색 및 실행
+    - @Test, @BeforeEach 등
+4)API 자동화 / 문서화
+   - REST API에서 요청/응답 구조 자동 추출
+   - Swagger, ktor features 등
+5)DSL, 컴파일러 플러그인, 내부 프레임워크
+   - 커스텀 애노테이션 처리, 바이트코드 생성, 내부 설정 기반 로직 구성 등
+   - Anvil, Compose compiler 등
+6)ORM
