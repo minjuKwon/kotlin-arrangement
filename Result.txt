@@ -1,0 +1,283 @@
+1. Result?
+1)개념
+- 코틀린에서 예외 처리를 함수형 스타일로 다루기 위해 도입된 클래스
+- 성공/실패 결과를 명시적으로 표현할 수 있어, 예외 기반의 흐름 제어를 줄이고 안정적인 코드 작성을 도와줌
+- Result<T>는 성공이면 값을, 실패면 예외를 담는 래퍼(wrapper) 클래스. Result는 다음 두 가지 상태 중 하나를 가짐.
+    - 성공 상태: 정상적인 결과 값을 담고 있음
+    - 실패 상태: 예외 객체(Throwable)를 담고 있음
+
+
+2)목적
+- 예외를 직접 던지지 않고 결과를 값으로 표현
+- 함수형 스타일에서 오류를 안전하게 처리
+- 안정성 향상 및 명시적인 오류 흐름 제공
+
+
+3)용도
+- 외부 API 호출, 파일 IO, DB 접근 등 실패 가능성이 있는 작업에서 사용
+- 순수 함수형 스타일로 예외를 피하고 싶은 경우
+- 여러 작업을 체이닝할 때, 실패 전파를 쉽게 처리하고 싶은 경우
+
+
+4)장점
+- 예외 던짐 없이 오류 관리 가능
+- 안전하고 명확한 오류 흐름
+- 함수형 스타일과 잘 어울림
+- try-catch보다 깔끔한 코드
+
+
+5)단점
+- 익숙하지 않으면 사용이 어려움
+- 디버깅 시 내부 값 접근이 제한됨 (내부 구현이 비공개)
+- 성능상 약간의 오버헤드 발생 가능
+
+
+
+2. runCatching 
+1)개념
+public inline fun <R> runCatching(block: () -> R): Result<R>
+
+- 코틀린에서 제공하는 함수로, 예외가 발생할 수 있는 코드를 Result로 감싸주는 유틸리티 함수
+
+- 내부적으로 try-catch를 수행하고 결과를 Result.Success 또는 Result.Failure로 반환
+inline fun <R> runCatching(block: () -> R): Result<R> {
+    return try {
+        Result.success(block())
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
+}
+
+- 예제 코드
+val result = runCatching { "abc".toInt() }
+
+result.onSuccess {
+    println("변환 성공: $it")
+}.onFailure {
+    println("에러 발생: ${it.message}")
+}
+
+
+2)목적
+- try-catch보다 간결하고 함수형 체이닝이 가능
+- Result로 감싸면 멤버 함수를 활용하여 쉽게 처리 가능
+
+
+3)주의점
+- Throwable을 상속한 예외만 감지
+    - return, break, exitProcess() 등은 예외가 아니기에 Result에 담기지 않음
+
+- 비동기 환경에서는 예외 전파 방식에 주의 필요. 
+    - suspend 함수는 runCatching 안에서 예외 감지 가능. suspend 함수가 예외를 던지면 runCatching 안의 try-catch에 의해 잡힘
+    - launch는 예외를 비동기적으로 처리하기에 runCatching에서 감지 불가능. launch는 코루틴을 별도 작업으로 실행해서 내부에서 예외가 발생해도, launch 블록 자체에서 비동기적으로 처리. runCatching 블록이 끝날 때까지 예외가 전파되지 않음.
+    - launch는 예외를 CoroutineExceptionHandler로 전달하거나 상위 스코프를 취소. runCatching은 launch 자체가 반환하는 Job을 감쌀 뿐, Job 내부의 예외는 감지 불가
+    - async { ... }.await()는 await() 시점에 예외가 발생하므로 감지 가능. 또한 launch 내부에서 runCatching 사용해야 됨
+
+- 예제코드
+val result = runCatching {
+    throw IllegalArgumentException("잘못된 인자")
+}
+println(result.isFailure) // true
+
+fun test(): Result<Int> {
+    return runCatching {
+        return 100 // 함수 자체가 여기서 종료. 예외가 아니기에 감지 안 됨
+    }
+}
+println(test()) // Result.success(100)이 나오지만 실제로 runCatching 블록이 중간에 종료됨
+
+val result = runCatching {
+    exitProcess(0) // 프로그램 종료. 예외 아니기에 catch 안 됨
+}
+println("출력되지 않음")
+
+suspend fun mayFail(): Int {
+    throw RuntimeException("실패")
+}
+val result = runCatching { mayFail() } // 정상적으로 Result.failure로 감지됨
+
+runBlocking {
+    val result = runCatching {
+        val job = launch {
+            throw IllegalStateException("예외 발생")
+        }
+        job.join()
+    }
+    println(result.isSuccess) // true, 예외는 잡히지 않음
+}
+
+val result = runCatching {
+    val deferred = async {
+        throw RuntimeException("예외")
+    }
+    deferred.await()  // 여기서 예외 발생하기에 runCatching 감지 가능
+}
+
+launch {
+    val result = runCatching {
+        throw RuntimeException("코루틴 내부 예외")
+    }
+    if (result.isFailure) {
+        println("잡았다")
+    }
+}
+
+
+
+3. 멤버
+1) 프로퍼티
+val isSuccess: Boolean
+결과가 성공 시 true 반환, 실패 시 false 반환
+
+val isFailure: Boolean
+결과가 실패 시 true 반환, 성공 시 false 반환
+
+
+2) 함수
+fun exceptionOrNull(): Throwable?
+실패 시 Throwable 예외 반환, 성공 시 null 반환
+
+inline fun getOrNull(): T?
+성공 시 결과 반환, 실패 시 null 반환
+
+open override fun toString(): String
+성공 시 "Success(value.toString())" 반환, 실패 시 "Failure(exception.toString())" 반환
+
+
+3)확장 함수
+inline fun <R, T : R> Result<T>.getOrDefault(defaultValue: R): R
+성공 시 결과 반환, 실패 시 기본 값 반환
+
+inline fun <T> Result<T>.getOrThrow(): T
+성공 시 결과 반환, 실패 시 발생한 예외 반환
+
+inline fun <R, T : R> Result<T>.getOrElse(onFailure: (exception: Throwable) -> R): R
+성공 시 결과 반환, 실패 시 전달한 onFailure의 예외 반환
+
+inline fun <R, T : R> Result<T>.recover(transform: (exception: Throwable) -> R): Result<R>
+성공시 원래 값 반환, 실패 시 발생하는 예외를 전달한 transform에 적용한 결과를 감싸서 반환
+
+inline fun <R, T : R> Result<T>.recoverCatching(
+    transform: (exception: Throwable) -> R
+): Result<R>
+성공시 원래 값 반환, 실패 시 발생하는 예외를 전달한 transform에 적용한 결과를 감싸서 반환. transform 함수 안에서 예외 발생 시, 예외를 Result.failure로 감싸서 반환
+
+inline fun <T> Result<T>.onFailure(action: (exception: Throwable) -> Unit): Result<T>
+실패 시 발생한 예외를 전달한 action에 적용 후 Result 객체 반환
+
+inline fun <R, T> Result<T>.map(transform: (value: T) -> R): Result<R>
+성공시 결과 값을 전달한 transform에 적용한 채 반환, 실패시 예외 반환
+
+inline fun <R, T> Result<T>.mapCatching(transform: (value: T) -> R): Result<R>
+성공시 결과 값을 전달한 transform에 적용한 채 반환, 실패시 예외 반환. transform 함수 안에서 예외 발생 시, 예외를 Result.failure로 감싸서 반환
+
+inline fun <T> Result<T>.onSuccess(action: (value: T) -> Unit): Result<T>
+성공 시, 값(value)에 전달한 action을 적용 후 Result 객체 반환
+
+inline fun <R, T> Result<T>.fold(
+    onSuccess: (value: T) -> R, 
+    onFailure: (exception: Throwable) -> R
+): R
+성공 시 onSuccess로 정의한 동작을 수행, 실패 시 인수 onFailure에 정의한 동작을 실행
+
+
+4)예제코드
+fun main() {
+    // 1. isSuccess / isFailure
+    val resultSuccess1 = runCatching { "123".toInt() }
+    println("resultSuccess1 isSuccess=${resultSuccess1.isSuccess}, isFailure=${resultSuccess1.isFailure}")
+    // resultSuccess1 isSuccess=true, isFailure=false
+
+    val resultFailure1 = runCatching { "abc".toInt() }
+    println("resultFailure1 isSuccess=${resultFailure1.isSuccess}, isFailure=${resultFailure1.isFailure}")
+    // resultFailure1 isSuccess=false, isFailure=true
+
+    // 2. exceptionOrNull
+    val exception2 = resultFailure1.exceptionOrNull()
+    println("exceptionOrNull=${exception2?.message}")
+    // exceptionOrNull=For input string: "abc"
+
+    // 3. getOrNull
+    val value3 = resultSuccess1.getOrNull()
+    println("getOrNull=$value3")
+    // getOrNull=123
+
+    // 4. toString
+    println("resultSuccess1.toString()=$resultSuccess1")
+    // resultSuccess1.toString()=Success(123)
+    println("resultFailure1.toString()=$resultFailure1")
+    // resultFailure1.toString()=Failure(java.lang.NumberFormatException: For input string: "abc")
+
+    // 5. getOrDefault
+    val value5 = resultFailure1.getOrDefault(0)
+    println("getOrDefault=$value5")
+    // getOrDefault=0
+
+    // 6. getOrThrow (success case)
+    val value6 = resultSuccess1.getOrThrow()
+    println("getOrThrow (success)=$value6")
+    // getOrThrow (success)=123
+
+    // 7. getOrElse
+    val value7 = resultFailure1.getOrElse { ex ->
+        println("getOrElse onFailure message=${ex.message}")
+        -1
+    }
+    // getOrElse onFailure message=For input string: "abc"
+    println("getOrElse result=$value7")
+    // getOrElse result=-1
+
+    // 8. recover
+    val resultRecover8 = resultFailure1.recover { ex ->
+        println("recover transform message=${ex.message}")
+        0
+    }
+    // recover transform message=For input string: "abc"
+    println("recover result=$resultRecover8")
+    // recover result=Success(0)
+
+    // 9. recoverCatching
+    val resultRecoverCatch9 = resultFailure1.recoverCatching {
+        throw IllegalStateException("recover failed")
+    }
+    println("recoverCatching result=$resultRecoverCatch9")
+    // recoverCatching result=Failure(java.lang.IllegalStateException: recover failed)
+
+    // 10. onFailure
+    val resultOnFailure10 = resultFailure1.onFailure { ex ->
+        println("onFailure message=${ex.message}")
+    }
+    // onFailure message=For input string: "abc"
+    println("onFailure result=$resultOnFailure10")
+    // onFailure result=Failure(java.lang.NumberFormatException: For input string: "abc")
+
+    // 11. onSuccess
+    val resultOnSuccess11 = resultSuccess1.onSuccess { v ->
+        println("onSuccess value=$v")
+    }
+    // onSuccess value=123
+    println("onSuccess result=$resultOnSuccess11")
+    // onSuccess result=Success(123)
+
+    // 12. map
+    val resultMap12 = resultSuccess1.map { it * 2 }
+    println("map result=$resultMap12")
+    // map result=Success(246)
+
+    // 13. mapCatching
+    val resultMapCatch13 = resultSuccess1.mapCatching { v ->
+        if (v > 100) throw IllegalStateException("over 100")
+        v * 2
+    }
+    println("mapCatching result=$resultMapCatch13")
+    // mapCatching result=Failure(java.lang.IllegalStateException: over 100)
+
+    // 14. fold
+    val message14 = resultFailure1.fold(
+        onSuccess = { "fold success: $it" },
+        onFailure = { "fold failure: ${it.message}" }
+    )
+    println(message14)
+    // fold failure: For input string: "abc"
+}
+
