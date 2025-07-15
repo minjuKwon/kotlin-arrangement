@@ -1,0 +1,151 @@
+1. enum class
+1)개념
+- 고정된 상수 집합을 선언할 때 사용하는 클래스
+- 컴파일하면 각 enum 항목은 클래스 내부의 public static final 필드로 정의
+- 각 상수는 객체로 취급되며, 생성자 및 메서드를 포함할 수 있음
+- 생성자를 통해 값을 초기화할 수 있고, 각 상수는 쉼표로 구분
+- 메서드를 정의할 경우 마지막 상수 뒤에 세미콜론(;) 필요
+- name, ordinal, toString() 등의 기본 멤버 제공
+- 인터페이스를 구현할 수 있으며, 항목마다 다르게 구현 가능
+
+
+2)예제코드
+enum class Color(val r: Int, val g: Int, val b: Int) {
+    RED(255, 0, 0), ORANGE(255, 165, 0), YELLOW(255, 255, 0),
+    GREEN(0, 255, 0), BLUE(0, 0, 255), INDIGO(75, 0, 130),
+    VIOLET(238, 130, 238);
+
+    fun rgb(): Int = (r * 256 + g) * 256 + b
+}
+
+fun getColor(color: Color) = when (color) {
+    Color.RED -> color.name // RED
+    Color.ORANGE -> color.ordinal // 1
+    Color.YELLOW -> color.toString() // YELLOW
+    Color.GREEN -> color.name // GREEN
+    Color.BLUE -> color.r // 0
+    Color.INDIGO -> color.g // 0
+    Color.VIOLET -> color.rgb()
+}
+
+fun main() {
+    println(Color.BLUE.rgb())
+    println(getColor(Color.BLUE))
+}
+
+enum class Color {
+    RED, GREEN, BLUE
+}
+
+public final class Color extends Enum<Color> {
+    public static final Color RED = new Color("RED", 0);
+    public static final Color GREEN = new Color("GREEN", 1);
+    public static final Color BLUE = new Color("BLUE", 2);
+
+    private static final Color[] VALUES = { RED, GREEN, BLUE };
+
+    public static Color[] values() { return VALUES.clone(); }
+    public static Color valueOf(String name) { ... }
+}
+
+
+interface Score {
+    fun getScore(): Int
+}
+
+enum class MemberType(var prio: String) : Score {
+    NORMAL("Third") {
+        override fun getScore(): Int = 100
+    },
+    SILVER("Second") {
+        override fun getScore(): Int = 500
+    },
+    GOLD("First") {
+        override fun getScore(): Int = 1500
+    }
+}
+
+fun main() {
+    println(MemberType.NORMAL.getScore()) // 100
+    println(MemberType.GOLD) // GOLD
+    println(MemberType.valueOf("SILVER")) // SILVER
+    println(MemberType.SILVER.prio) // Second
+
+    for (grade in MemberType.values()) {
+        println("name = ${grade.name}, prio = ${grade.prio}")
+    }
+}
+
+
+
+2. sealed class
+1)개념
+- sealed 키워드를 사용해 하위 클래스 계층을 제한하는 추상 클래스
+- abstract이므로 sealed class 자체는 인스턴스화 불가. 하위 타입을 통해서만 인스턴스화 가능
+- 같은 파일 내에서만 상속 가능. 외부 파일에 있으면 컴파일러가 상속 계층 파악에 어려움 있음
+- 클래스이므로 단일 상속만 가능
+- 모든 하위 타입이 컴파일 타임에 고정되므로 when에서 else가 필요 없음
+
+
+2)sealed class vs sealed interface
+항목	sealed class	sealed interface
+용도	상태 표현 및 공통 로직 포함 가능	행위 정의 중심, 상태 정보는 없음
+하위 타입 허용	클래스만 상속 가능 (open 필요)	클래스, 인터페이스 모두 가능 (기본 open)
+생성자	생성자 정의 가능	생성자 정의 불가
+다중 상속	불가능	가능
+
+
+3)예제코드
+//FileA.kt
+sealed class ResultA{
+    open class Success(val message:String):ResultA()
+    class Error(val code:Int, val message:String):ResultA()
+}
+class Status:ResultA()
+class Inside:ResultA.Success("Status")
+
+//FileB.kt
+sealed class ResultB
+//open class Success(val message:String):ResultA() 불가능
+open class Success(val message:String):ResultB()
+class Error(val code:Int val message:String):ResultB()
+class Status:ResultB()
+class Inside:ResultB.Succecss("Status")
+
+//main.kt
+fun main() {
+    val result = ResultA.Success("Good")
+    val msg = eval(result)
+    println(msg)
+}
+fun eval(result: ResultA): String = when (result) {
+    is Status -> "In progress"
+    is ResultA.Success -> result.message
+    is ResultA.Error -> result.message
+//모든 조건을 검사했으므로 else 불필요
+}
+
+
+3. enum class vs sealed class
+용도	고정된 상수 집합 표현에 적합	각 상태에 다른 데이터/행위가 필요한 경우 적합
+항목별 데이터	생성자 통해 값 전달 가능	각 상태에 서로 다른 프로퍼티 정의 가능
+구조	모든 항목이 동일 구조여야 함	서로 다른 구조 가질 수 있음
+상속	불가능	하위 클래스 상속 가능 (단일 상속)
+when 사용 시	else 필요	모든 하위 타입 나열하면 else 생략 가능
+- sealed class 내부에서 각 상태가 데이터를 가지지 않고 고정된 경우, class나 data class 대신 object 사용 권장
+- sealed class 내부가 모두 object이면 enum class로 대체 가능
+- enum class에서 각 항목에 로직이나 상태가 필요하면 sealed class로 대체 가능
+- 예제코드
+enum class UiState {
+    Loading,
+    Success,
+    Error
+}
+
+sealed class UiState {
+    object Loading : UiState()
+    data class Success(val data: List<Item>) : UiState()
+    data class Error(val message: String) : UiState()
+}
+
+ 
