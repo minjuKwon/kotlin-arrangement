@@ -1,0 +1,77 @@
+flow 개념
+flow는 비동기적으로 생성 및 처리할 수 있는 데이터 스트림
+데이터를 유연하게 변경하여 실시간으로 받을 수 있기에 사용
+Cold Flow는 구독을 해야지 데이터가 방출되고 Hot Flow는 구독과 상관없이 방출
+
+
+
+flow 메서드
+초기값 설정
+stateIn
+초기값을 값는 StateFlow(Hot Flow)으로 변환
+구독 전에 초기값이 정해져 있어 구독 즉시 값을 사용
+dataFlow
+    .stateIn(
+        scope = scope,
+        started = SharingStarted.Lazily,
+        initialValue = emptyList()
+    )
+
+onStart
+기존 Flow에 초기 이벤트 할당
+Cold Flow에 사용 가능하여 구독되어야 초기 이벤트 발생
+구독 시 초기 이벤트를 넣고 싶거나, 초기값이 없지만 시작 시 emit하고 싶은 경우
+dataFlow
+    .onStart { emit(initialValue) }
+
+
+필터링
+filterNotNull
+null 값을 걸러내고 null이 아닌 값이 나와야 방출
+실제 값이 발생하기 전까지 대기
+dataFlow.filterNotNull()
+
+mapNotNull
+null은 자동으로 필터링되고, 값이 있으면 매핑 가능
+dataFlow.mapNotNull { it?.data }
+
+
+타이밍 조절
+debounce
+짧은 시간 내 연속 이벤트를 묶어 처리
+dataFlow
+    .debounce(300)
+    .collect { query -> search(query) }
+
+sample
+일정 간격으로 최신값만 발행
+dataFlow
+    .sample(1000) // 1초마다 최신값 발행
+
+combine + distinctUntilChanged
+여러 Flow 결합 시 초기값 문제 해결
+이전 값과 달라야 downstream에 전달되어 불필요한 이벤트 처리 방지
+flowA
+    .combine(flowB) { a, b -> a + b }
+    .distinctUntilChanged()
+
+
+
+타이밍 제어
+StateFlow + null + filterNotNull
+StateFlow 또는 StateFlow으로 변환한 후 null을 할당하여 filterNotNull으로 대기 후 수신
+초기값을 결정하기 어려울 때 유용
+null 체크/플래그 변수를 별도로 두지 않아도 됨
+downstream에서는 항상 non-null 값만 처리
+onStart과 결합하면 초기 이벤트 방출 가능
+
+
+SharedFlow
+초기값이 없지만 그대신 값이 발행될 때만 downstream에 전달
+별도의 초기 값 설정 불필요
+StateFlow는 상태 관리를 위해 사용한다면 SharedFlow는 이벤트, 알림, 일회성 처리에 사용
+
+
+플래그 변수 사용
+Flow 자체로는 상태를 표현하기 어렵거나, Flow 외부에서 제어해야 할 때 사용
+Flow 값 자체가 아닌 흐름 제어 목적으로 사용 가능(예 처음 1회만 실행)
