@@ -1,28 +1,34 @@
 1. String
+1)개념
+- 불변 객체
+- 한 번 생성되면 내용 변경 불가
+- 문자열 리터럴은 String Pool에서 재사용됨. 이때 String Pool은 JVM이 문자열 리터럴을 저장해 두는 전용 메모리 영역. 동일한 리터럴을 만나면 새 객체를 만들지 않고 기존 객체 참조
 
-불변(immutable) 객체
-한 번 생성되면 내용 변경 불가
-문자열 리터럴은 String Pool에서 재사용됨. 이때 String Pool은 JVM이 문자열 리터럴을 저장해 두는 전용 메모리 영역. 동일한 리터럴을 만나면 새 객체를 만들지 않고 기존 객체 참조
 
-특징
-안전함 (thread-safe)
-변경 시마다 새로운 객체 생성 → 잦은 수정에는 비효율적
+2)특징
+- 스레드에 안전. 여러 스레드가 동시에 같은 String 객체를 사용해도 데이터가 깨지지 않음.
+- 변경 시마다 새로운 객체 생성. 잦은 수정에는 비효율적
 
+
+3)예시
 String s = "hello";
 s = s + " world"; // 새 String 객체 생성
 
 
 
 2. StringBuilder
+1)개념
+- 가변 객체
+- 내부 버퍼를 직접 수정
+- 단일 스레드 환경에서 빠름
 
-가변(mutable) 객체
-내부 버퍼를 직접 수정
-단일 스레드 환경에서 빠름
 
-특징
-문자열을 반복적으로 수정할 때 효율적
-thread-safe 아님
+2)특징
+- thread-safe 아님
+- 문자열을 반복적으로 수정할 때 효율적
 
+
+3)예시
 StringBuilder sb = new StringBuilder();
 sb.append("hello");
 sb.append(" world");
@@ -31,138 +37,115 @@ String result = sb.toString();
 
 
 3. CharSequence
-
-인터페이스
-“문자열처럼 읽을 수 있는 객체”의 공통 규약
-이 인터페이스는 여러 종류의 문자 시퀀스에 대해 통일된 읽기 전용 접근 방식을 제공
-유연성과 성능을 위해 사용
-
-public interface CharSequence {
-    int length();
-    char charAt(int index);
-    CharSequence subSequence(int start, int end);
-}
+1)개념
+- 인터페이스. 문자열처럼 읽을 수 있는 객체의 공통 규약
+- 여러 종류의 문자 시퀀스에 대해 통일된 읽기 전용 접근 방식을 제공
+- 유연성과 성능을 위해 사용
 
 
-CharSequence 구조
-char 타입(및 Character 객체)은 원래 16비트 고정 폭 문자를 정의했던 초기 Unicode 사양을 기반
-CharSequence는 char 값들의 읽기 전용 시퀀스이다.하지만 이후 Unicode 표준은 16비트를 초과하는 문자를 허용하도록 확장. 유효한 코드 포인트 범위: U+0000 ~ U+10FFFF. 이를 Unicode 스칼라 값(Unicode scalar value)이라 부름. 하지만 기존 시스템(자바 포함)은 이미 16비트 char에 의존 중. UTF-16 유지 + 확장하는 방법이 필요하여 보조 문자 + 서로게이트 페어 도입. 즉, char 값은 BMP(Basic Multilingual Plane)에 속한 문자이거나 서로게이트(surrogate)를 나타냄.
 
-BMP (Basic Multilingual Plane)은 U+0000 ~ U+FFFF 범위를 가지며 char 하나 = 문자 하나. 대부분의 일반 문자 포함
+4. CharSequence 구조
+1)개념
+- CharSequence는 char 값들의 읽기 전용 시퀀스. char 타입 및 Character 객체는 Unicode 기반. Unicode는 16비트의 고정된 길이의 문자를 정의.
+- 이후 Unicode 표준은 16비트를 초과하는 문자를 허용하도록 확장. 이때 유효해진 코드 포인트 범위는 U+0000 ~ U+10FFFF. 
+- 기존 시스템은 이미 16비트 char에 의존 중. 확장하는 방법이 필요하여 보조 문자 + 서로게이트 페어 도입. 즉, char 값은 BMP(Basic Multilingual Plane)에 속한 문자이거나 서로게이트(surrogate)를 나타냄.
 
-보조 문자는(Supplementary character) U+10000 이상. 이모지 대부분, 특수 기호 등이 포함. 자바 플랫폼은 char[], String, StringBuffer 에서 UTF-16 인코딩을 사용. char 하나로는 표현 불가. UTF-16에서는 보조 문자를 char 두 개(서로게이트 페어)로 표현. 첫 번째: 상위 서로게이트 (\uD800 ~ \uDBFF), 두 번째: 하위 서로게이트 (\uDC00 ~ \uDFFF). 즉, 겉보기엔 1글자지만 UTF-16 코드 유닛(char)은 2개임. 상위 서로게이트와 하위 서로게이트 (Low Surrogate)가 순서대로 붙어야 하나의 문자가 됨
+
+2)BMP와 보조문자
+ⅰ)BMP
+- BMP는 U+0000 ~ U+FFFF 범위를 가지며 char 하나 = 문자 하나. 대부분의 일반 문자 포함
+ⅱ)보조 문자
+- 보조 문자는(Supplementary character) U+10000 이상. 이모지 대부분, 특수 기호 등이 포함. 
+- 자바 플랫폼은 char[], String, StringBuffer 에서 UTF-16 인코딩을 사용. char 하나로는 표현 불가. 
+- UTF-16에서는 보조 문자를 char 두 개(서로게이트 페어)로 표현. 첫 번째상위 서로게이트 (\uD800 ~ \uDBFF), 두 번째 하위 서로게이트 (\uDC00 ~ \uDFFF). 
+- 즉, 겉보기엔 1글자지만 UTF-16 코드 유닛(char)은 2개임. 상위 서로게이트와 하위 서로게이트 (Low Surrogate)가 순서대로 붙어야 하나의 문자가 됨
+//high나 low 단독으로는 의미 없음
+//UTF-16 파서가 BMP 문자가 아니라 보조 문자의 일부임을 즉시 파악 가능하기 때문
 String s = "😀";
 char high = s.charAt(0);
 char low  = s.charAt(1);
 
-이 범위는 절대 단독 문자로 쓰이지 않도록 예약된 영역. UTF-16 파서가 BMP 문자가 아니라 보조 문자의 일부임을 즉시 파악 가능하기 때문.
 
-
-char 와 int 의 차이
-char은 BMP 문자 또는 서로게이트 코드 유닛을 표현, UTF-16의 코드 유닛. char만 받는 메서드는 보조 문자를 지원하지 않음, 서로게이트 값은 정의되지 않은 문자로 처리. 
+3)char와 int의 차이
+ⅰ)char
+- char은 BMP 문자 또는 서로게이트 코드 유닛을 표현하는 UTF-16의 코드 유닛. 
+- char만 받는 메서드는 보조 문자를 지원하지 않음, 서로게이트 값은 정의되지 않은 문자로 처리. 
+//단독으로는 의미 없고, 문자열에서 하위 서로게이트와 쌍을 이뤄야 실제 문자가 됨
 Character.isLetter('\uD840') // false
-이 값은 단독으로는 의미 없고, 문자열에서 하위 서로게이트와 쌍을 이뤄야 실제 문자가 됨
-
-int는 모든 Unicode 코드 포인트 표현 가능, 실제 문자를 의미. int를 받는 메서드는 모든 Unicode 문자 지원, 보조 문자도 정상 처리
+ⅱ)int
+- int는 모든 Unicode 코드 포인트 표현 가능, 실제 문자를 의미. 
+- 하위 21비트 사용 (U+10FFFF까지)
+- int를 받는 메서드는 모든 Unicode 문자 지원, 보조 문자도 정상 처리
+//실제로 하나의 문자를 의미
 Character.isLetter(0x2F81A) // true
-이 값은 실제로 하나의 문자(CJK 한자)를 의미
 
 
-하위 21비트 사용 (U+10FFFF까지)
-equals / hashCode 관련 주의사항
-이 인터페이스는 equals와 hashCode 메서드의 일반적인 계약을 정의하거나 보장하지 않는다.
-따라서 CharSequence를 구현한 두 객체를 비교했을 때의 결과는 일반적으로 정의되어 있지 않다.
-서로 다른 클래스가 CharSequence를 구현했을 수 있고
-각 클래스가 서로 다른 구현체 간의 동등성 비교를 지원한다는 보장이 없다
-그래서 임의의 CharSequence 객체를 Set의 요소나 Map의 key로 사용하는 것은 부적절
+4)equals/ hashCode
+- equals와 hashCode 메서드의 일반적인 계약을 정의하거나 보장하지 않음
+- CharSequence를 구현한 두 객체를 비교했을 때의 결과는 일반적으로 정의되어 있지 않음
+- 서로 다른 클래스가 CharSequence를 구현했을 수 있고 각 클래스가 서로 다른 구현체 간의 동등성 비교를 지원한다는 보장이 없기 때문
+- 임의의 CharSequence 객체를 Set의 요소나 Map의 key로 사용하는 것은 부적절
 
 
-chars()와 codePoints()
-public IntStream chars()
-CharSequence의 char 값들을 그대로 int로 변환해서 스트림으로 반환
-각 요소 = UTF-16 코드 유닛
-서로게이트도 그냥 char 하나로 처리
-보조 문자 분해됨
+5)chars()와 codePoints()
+ⅰ)public IntStream chars()
+CharSequence의 char 값들을 그대로 int로 변환해서 스트림으로 반환. 각 요소 = UTF-16 코드 유닛. 서로게이트도 그냥 char 하나로 처리되어 보조 문자 분해됨.
+
 String s = "A😀B";
 [A][\uD83D][\uDE00][B]
-s.chars() 결과:
+
+s.chars() 결과로는
 65
 55357   (상위 서로게이트)
 56832   (하위 서로게이트)
 66
-즉, 이모지가 둘로 쪼개짐
-서로게이트 값이어도 그냥 그대로 넘겨서 보조 문자로 합치지 않음
-스트림 생성 시점이 아니라
-최종 연산(forEach 등) 시작 시점에 실제 데이터에 연결됨
-mutable한 경우 도중 변경하면 결과 정의 안 됨
 
-public IntStream codePoints()
-CharSequence의 실제 Unicode 코드 포인트 단위로 스트림을 반환함.
-서로게이트 페어를 만나면
-Character.toCodePoint()처럼 합쳐서 하나로 처리
+즉, 이모지가 둘로 쪼개짐. 서로게이트 값이어도 그냥 그대로 넘겨서 보조 문자로 합치지 않음. 스트림 생성 시점이 아니라 최종 연산(forEach 등) 시작 시점에 실제 데이터에 연결됨. mutable한 경우 도중 변경하면 결과 정의 안 됨
+
+ⅱ)public IntStream codePoints()
+CharSequence의 실제 Unicode 코드 포인트 단위로 스트림을 반환함. 서로게이트 페어를 만나면 Character.toCodePoint()처럼 합쳐서 하나로 처리
+
 String s = "A😀B";
-s.codePoints() 결과:
+
+s.codePoints() 결과로는
 65
 128512   (😀)
 66
-위+하위가 연속되면 합쳐서 하나의 코드 포인트로 만듦
-BMP 문자, 짝 없는 서로게이트, 이상한 값은 그냥 int로 변환하여 넘김
-스트림 생성 시점이 아니라
-최종 연산(forEach 등) 시작 시점에 실제 데이터에 연결됨
-mutable한 경우 도중 변경하면 결과 정의 안 됨
 
-chars()
-UTF-16 단위 처리가 필요할 때
-내부 인코딩 레벨 작업
+즉, 위+하위가 연속되면 합쳐서 하나의 코드 포인트로 만듦. BMP 문자, 짝 없는 서로게이트, 이상한 값은 그냥 int로 변환하여 넘김. 스트림 생성 시점이 아니라 최종 연산(forEach 등) 시작 시점에 실제 데이터에 연결됨. mutable한 경우 도중 변경하면 결과 정의 안 됨
 
-codePoints()
-실제 문자 단위 처리
-이모지 포함 텍스트 분석
-문자 개수 세기
+ⅲ)비교
+- chars()
+   - UTF-16 단위 처리가 필요할 때
+   - 내부 인코딩 레벨 작업
+- codePoints()
+   - 실제 문자 단위 처리
+   - 이모지 포함 텍스트 분석
+   - 문자 개수 세기
 
 
-구현체
-String
-StringBuilder
-StringBuffer
+6)사용 목적
+ⅰ) 구현체를 숨길 수 있음
+setText(CharSequence text)가 있다면 호출하는 쪽에서 String, StringBuilder, SpannableString 중 어떤 걸 넘겨도 됨. API 확장성 증가
 
-
-사용 목적
-1) 구현체를 숨길 수 있음
-
-메서드 시그니처를 이렇게 두면
-void setText(CharSequence text)
-
-호출하는 쪽에서
-String
-StringBuilder
-SpannableString
-어떤 걸 넘겨도 됨
-→ API 확장성 증가
-
-2) 안드로이드의 Spannable 때문
-안드로이드 UI 텍스트는 스타일 정보 포함 가능
-
-예
-글자색 일부만 변경
-클릭 가능한 텍스트
-굵기, 밑줄, 이미지 포함
-
-이건 String으로 불가능하고
-SpannableString 같은 CharSequence 구현체로 처리함
+ⅱ) 안드로이드의 Spannable
+안드로이드 UI 텍스트는 스타일 정보 포함 가능. 예시로 글자색 일부만 변경, 클릭 가능한 텍스트, 굵기/밑줄/이미지 포함. String으로는 처리 불가능하고 SpannableString 같은 CharSequence 구현체로 처리함.
 
 TextView.setText(CharSequence text)
 
-3) 불필요한 String 생성 방지
-
-이미 CharSequence인 데이터를
-굳이 toString()으로 복사하지 않아도 됨
-→ 메모리 절약
-→ GC 부담 감소 (안드로이드에서 중요)
+ⅲ) 불필요한 String 생성 방지
+이미 CharSequence인 데이터를 굳이 toString()으로 복사하지 않아도 됨.
+메모리 절약되고 GC 부담이 감소되는데 이는 안드로이드에서 중요.
 
 
+7)구현체
+- String
+- StringBuilder
+- StringBuffer
 
-요약
+
+
+5. 요약
 | 항목       | String | StringBuilder | CharSequence |
 | -------- | ------ | ------------- | ------------ |
 | 타입       | 클래스    | 클래스           | 인터페이스        |
@@ -171,6 +154,6 @@ TextView.setText(CharSequence text)
 | 안드로이드 핵심 | 기본 텍스트 | 문자열 조립        | UI 텍스트 표준    |
 
 
-고정 문자열 → String
-반복 수정 → StringBuilder
-API 파라미터 / UI 텍스트 → CharSequence
+- 고정 문자열 → String
+- 반복 수정 → StringBuilder
+- API 파라미터 / UI 텍스트 → CharSequence
